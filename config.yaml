@@ -1,0 +1,4 @@
+# Default cost assumptions (tune these for business sensitivity)
+cost_fp: 50   # cost per false positive (e.g., manual review cost or lost revenue)
+cost_fn: 500  # cost per false negative (missed fraud)
+optimal_threshold: 0.5
