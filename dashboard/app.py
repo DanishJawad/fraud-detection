@@ -1,4 +1,6 @@
 """Streamlit dashboard for monitoring the fraud detection API."""
+import os
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -7,7 +9,8 @@ from pathlib import Path
 st.set_page_config(page_title="Fraud Detection Monitoring", layout="wide")
 st.title("🚨 Fraud Detection Monitoring")
 
-API_URL = st.sidebar.text_input("API URL", "http://localhost:8000")
+# In docker-compose the API is reachable at the service name, not localhost.
+API_URL = st.sidebar.text_input("API URL", os.getenv("API_URL", "http://localhost:8000"))
 
 tab1, tab2, tab3 = st.tabs(["Overview", "Details", "Alerts"])
 

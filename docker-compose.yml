@@ -15,15 +15,14 @@ services:
     restart: unless-stopped
 
   monitoring-dashboard:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
     container_name: fraud-monitoring
-    working_dir: /app
-    command: bash -c "pip install streamlit requests pandas && streamlit run dashboard/app.py --server.port=8501"
     ports:
       - "8501:8501"
-    volumes:
-      - ./dashboard:/app/dashboard
-      - ./models:/app/models
+    environment:
+      - API_URL=http://fraud-api:8000
     depends_on:
       - fraud-api
     restart: unless-stopped

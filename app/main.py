@@ -3,7 +3,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 import numpy as np
 from monitoring.tracker import PerformanceMonitor
-from .models import PredictionRequest, PredictionResponse, HealthResponse, MetricsResponse
+from .models import (
+    PredictionRequest,
+    PredictionResponse,
+    HealthResponse,
+    MetricsResponse,
+    FeedbackRequest,
+)
 from .config import Config
 from .registry import ModelRegistry
 
@@ -82,13 +88,15 @@ async def predict(request: PredictionRequest):
         else:
             risk = "low"
 
+        prediction_id = ""
         try:
             if monitor is not None:
-                monitor.log_prediction(prob, actual_label=None)
+                prediction_id = monitor.log_prediction(prob, actual_label=None)
         except Exception:
             pass
 
         return PredictionResponse(
+            prediction_id=prediction_id,
             fraud_probability=prob,
             predicted_class=predicted_class,
             risk_level=risk,
@@ -123,6 +131,36 @@ async def metrics():
         false_alarm_rate=float(metadata.get("false_alarm_rate", 0.0)),
         cost_savings_percent=float(metadata.get("cost_savings_percent", 0.0)),
     )
+
+
+@app.post("/feedback")
+async def feedback(request: FeedbackRequest):
+    """Attach a confirmed ground-truth label to a previous /predict call.
+
+    Simulates how fraud labels actually arrive in production: a chargeback
+    or manual review confirms whether a transaction was fraud some time
+    after the prediction was made. This is what makes /monitoring reflect
+    real traffic instead of staying empty forever.
+    """
+    if monitor is None:
+        raise HTTPException(status_code=503, detail="Monitor not available")
+    updated = monitor.update_label(request.prediction_id, request.actual_label)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Unknown prediction_id")
+    return {"status": "recorded"}
+
+
+@app.get("/monitoring")
+async def monitoring_summary():
+    """Live drift + business-cost metrics computed from labeled traffic so far."""
+    if monitor is None:
+        raise HTTPException(status_code=503, detail="Monitor not available")
+    metadata = (model_data or {}).get("metadata", {})
+    threshold = metadata.get("optimal_threshold", Config.OPTIMAL_THRESHOLD)
+    return {
+        "summary": monitor.get_summary(),
+        "business_metrics": monitor.get_business_metrics(threshold=threshold),
+    }
 
 
 @app.get("/models")

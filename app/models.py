@@ -10,6 +10,7 @@ class PredictionRequest(BaseModel):
 
 class PredictionResponse(BaseModel):
     """Prediction response."""
+    prediction_id: str
     fraud_probability: float
     predicted_class: int
     risk_level: str
@@ -26,3 +27,9 @@ class MetricsResponse(BaseModel):
     fraud_detection_rate: float
     false_alarm_rate: float
     cost_savings_percent: float
+
+
+class FeedbackRequest(BaseModel):
+    """Ground-truth label for a previous prediction (e.g. a confirmed chargeback)."""
+    prediction_id: str
+    actual_label: int

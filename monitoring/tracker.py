@@ -2,6 +2,7 @@
 from datetime import datetime
 from pathlib import Path
 import json
+import uuid
 from typing import Optional, Dict, List
 import numpy as np
 from app.config import Config
@@ -40,8 +41,10 @@ class PerformanceMonitor:
         except Exception:
             pass
 
-    def log_prediction(self, fraud_prob: float, actual_label: Optional[int] = None):
+    def log_prediction(self, fraud_prob: float, actual_label: Optional[int] = None) -> str:
+        prediction_id = uuid.uuid4().hex
         entry = {
+            "id": prediction_id,
             "timestamp": datetime.now().isoformat(),
             "fraud_probability": float(fraud_prob),
             "actual_label": actual_label,
@@ -57,6 +60,23 @@ class PerformanceMonitor:
         except Exception:
             # don't let DB issues affect main flow
             pass
+
+        return prediction_id
+
+    def update_label(self, prediction_id: str, actual_label: int) -> bool:
+        """Attach a ground-truth label to a previously logged prediction.
+
+        Updates the in-memory log only, so business metrics reflect it for
+        the lifetime of this process. It is not replayed back into the JSONL
+        file on restart — persisting corrected labels durably would need the
+        Postgres path in monitoring/db.py instead of a rewrite-on-every-label
+        approach to a flat file.
+        """
+        for entry in reversed(self.predictions_log):
+            if entry.get("id") == prediction_id:
+                entry["actual_label"] = actual_label
+                return True
+        return False
 
     def get_drift_metrics(self, window_size: int = 1000) -> Optional[Dict]:
         if len(self.predictions_log) < 100:
@@ -74,14 +94,18 @@ class PerformanceMonitor:
             "threshold": 0.15,
         }
 
-    def get_business_metrics(self, recent_labels: List[int], threshold: float = 0.35) -> Optional[Dict]:
-        if not recent_labels or len(self.predictions_log) < len(recent_labels):
+    def get_business_metrics(self, threshold: float = 0.35, window_size: int = 1000) -> Optional[Dict]:
+        """Compute detection rate / false-positive rate / cost from whichever
+        logged predictions have received a label via update_label() so far.
+        """
+        labeled = [p for p in self.predictions_log if p.get("actual_label") is not None]
+        if not labeled:
             return None
-        recent = self.predictions_log[-len(recent_labels):]
-        tp = sum(1 for p, label in zip(recent, recent_labels) if p["fraud_probability"] > threshold and label == 1)
-        fp = sum(1 for p, label in zip(recent, recent_labels) if p["fraud_probability"] > threshold and label == 0)
-        fn = sum(1 for p, label in zip(recent, recent_labels) if p["fraud_probability"] <= threshold and label == 1)
-        tn = sum(1 for p, label in zip(recent, recent_labels) if p["fraud_probability"] <= threshold and label == 0)
+        recent = labeled[-window_size:]
+        tp = sum(1 for p in recent if p["fraud_probability"] > threshold and p["actual_label"] == 1)
+        fp = sum(1 for p in recent if p["fraud_probability"] > threshold and p["actual_label"] == 0)
+        fn = sum(1 for p in recent if p["fraud_probability"] <= threshold and p["actual_label"] == 1)
+        tn = sum(1 for p in recent if p["fraud_probability"] <= threshold and p["actual_label"] == 0)
         detection_rate = tp / (tp + fn) if (tp + fn) > 0 else 0
         fp_rate = fp / (fp + tn) if (fp + tn) > 0 else 0
         cost_fp = float(Config.COST_FALSE_POSITIVE)

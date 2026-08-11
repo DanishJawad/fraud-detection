@@ -18,7 +18,9 @@ class Config:
     API_TITLE = "Fraud Detection API"
     API_VERSION = "1.0.0"
 
-    # Default threshold (will be overridden by metadata if present)
+    # Fallback only, used if models/metadata.json is missing. In normal
+    # operation the real threshold comes from metadata["optimal_threshold"],
+    # written by scripts/train.py — see app/main.py's /predict handler.
     OPTIMAL_THRESHOLD = float(os.getenv("OPTIMAL_THRESHOLD", 0.35))
 
     # Business costs (defaults, can be changed by CLI/env)
