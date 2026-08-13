@@ -1,0 +1,38 @@
+Loading data: data/creditcard.csv
+
+Class balance (full dataset)
+  rows: 284807  fraud: 492  legitimate: 284315
+  fraud rate: 0.172749%  (1 fraud per 578.9 transactions)
+
+Temporal split (train fits the model, val picks the threshold, test is read once)
+  train:  170888 rows   360 fraud  (0.2107%)
+  val  :   56957 rows    57 fraud  (0.1001%)
+  test :   56962 rows    75 fraud  (0.1317%)
+
+Training baseline (logistic regression, no SMOTE)...
+Training SMOTE pipeline...
+
+Cost assumptions: $50 per false positive, $500 per false negative (ratio 1:10)
+
+Threshold selected on VALIDATION: 0.50 (val cost $7100.00)
+  minimum-cost plateau: 0.50-0.55 (6 thresholds tie; the sweep keeps the lowest)
+  val   ROC-AUC 0.9491  recall 75.4%  precision 95.6%  FPR 0.0035%
+
+FINAL — TEST set at threshold 0.50 (selected on val, test read once)
+  ROC-AUC:             0.9666
+  Recall:              73.3333%
+  Precision:           93.2203%
+  False positive rate: 0.007031%
+  Confusion:           tp=55 fp=4 fn=20 tn=56883
+  Cost:                $10200.00
+
+Reference — TEST at naive threshold 0.5 (not used, logged for comparison)
+  recall 73.3333%  precision 93.2203%  FPR 0.007031%  cost $10200.00
+
+Baseline — logistic regression, no SMOTE, threshold 0.11 picked on val
+  TEST recall 72.0000%  precision 67.5000%  FPR 0.045705%  cost $11800.00
+  Cost savings, SMOTE pipeline vs. this baseline: 13.6%
+
+Saved metrics to outputs/metrics.json
+Saved model + metadata to models/
+Saved cost sensitivity sweep to outputs/cost_sensitivity.csv

@@ -15,14 +15,14 @@ import time
 
 import requests
 
-from src.preprocessing import load_data, split_xy, train_test_split_time
+from src.preprocessing import load_data, split_xy, train_val_test_split_time
 
 
 def main(api_url: str, data_path: str, n: int, report_every: int, delay: float):
     df = load_data(data_path)
     # Same temporal split as scripts/train.py, so this is genuinely the
-    # held-out slice the model has never seen.
-    _, test = train_test_split_time(df)
+    # held-out slice: never trained on, and never used to pick the threshold.
+    _, _, test = train_val_test_split_time(df)
     X_test, y_test = split_xy(test)
     X_test = X_test.drop(columns=[c for c in ["Time"] if c in X_test.columns])
 

@@ -1,0 +1,37 @@
+# Both Dockerfiles do `COPY . /app`. Without this file the build context is
+# roughly 1GB: data/ is ~370MB of CSVs and .venv/ is ~620MB of macOS-built
+# packages that would be useless (and wrong) inside a Linux image.
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Datasets: downloaded from Kaggle, never baked into the image.
+data/
+
+# Trained artifacts: mounted in at runtime by docker-compose, not copied in,
+# so the image doesn't go stale every time the model is retrained.
+models/
+*.pkl
+
+.git/
+.gitignore
+.pytest_cache/
+.vscode/
+.idea/
+.DS_Store
+
+.env
+.env.local
+.envrc
+
+notebooks/
+docs/
+tests/
+monitoring/*.jsonl
+
+README.md
+LICENSE

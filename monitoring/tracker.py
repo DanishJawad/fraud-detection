@@ -94,9 +94,14 @@ class PerformanceMonitor:
             "threshold": 0.15,
         }
 
-    def get_business_metrics(self, threshold: float = 0.35, window_size: int = 1000) -> Optional[Dict]:
+    def get_business_metrics(self, threshold: float, window_size: int = 1000) -> Optional[Dict]:
         """Compute detection rate / false-positive rate / cost from whichever
         logged predictions have received a label via update_label() so far.
+
+        threshold is required on purpose. A default here would be a second
+        copy of the operating threshold that could silently disagree with the
+        one the model is actually served at, making these numbers describe a
+        model nobody is running.
         """
         labeled = [p for p in self.predictions_log if p.get("actual_label") is not None]
         if not labeled:

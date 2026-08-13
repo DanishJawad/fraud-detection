@@ -34,6 +34,24 @@ async def startup_event():
         print(f"Warning: model failed to load on startup: {e}")
 
 
+def _serving_threshold(metadata: dict) -> float:
+    """The decision threshold, read only from the trained artifact.
+
+    There is deliberately no default. A hardcoded fallback is how the repo
+    previously ended up with three different thresholds (config.yaml 0.5,
+    docker-compose 0.35, the actual trained value) and no way to tell which
+    one was live. Serving a silent fallback would mean quietly operating at a
+    threshold nothing was validated at, so a missing value fails the request.
+    """
+    threshold = (metadata.get("threshold") or {}).get("value")
+    if threshold is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No threshold in model metadata. Run scripts/train.py.",
+        )
+    return float(threshold)
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health():
     """Health check endpoint."""
@@ -78,7 +96,7 @@ async def predict(request: PredictionRequest):
 
         prob = float(model.predict_proba(X)[0][1])
 
-        threshold = metadata.get("optimal_threshold", Config.OPTIMAL_THRESHOLD)
+        threshold = _serving_threshold(metadata)
         predicted_class = 1 if prob > threshold else 0
 
         if prob > 0.7:
@@ -125,11 +143,17 @@ async def metrics():
     if model_data is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     metadata = model_data.get("metadata", {})
+    test = metadata.get("test") or {}
+    split = metadata.get("split") or {}
     return MetricsResponse(
-        roc_auc=float(metadata.get("roc_auc", 0.0)),
-        fraud_detection_rate=float(metadata.get("fraud_detection_rate", 0.0)),
-        false_alarm_rate=float(metadata.get("false_alarm_rate", 0.0)),
+        roc_auc=float(test.get("roc_auc", 0.0)),
+        recall=float(test.get("recall", 0.0)),
+        precision=float(test.get("precision", 0.0)),
+        false_positive_rate=float(test.get("false_positive_rate", 0.0)),
         cost_savings_percent=float(metadata.get("cost_savings_percent", 0.0)),
+        threshold=_serving_threshold(metadata),
+        n_test=int(split.get("n_test", 0)),
+        n_fraud_test=int(split.get("n_fraud_test", 0)),
     )
 
 
@@ -156,7 +180,7 @@ async def monitoring_summary():
     if monitor is None:
         raise HTTPException(status_code=503, detail="Monitor not available")
     metadata = (model_data or {}).get("metadata", {})
-    threshold = metadata.get("optimal_threshold", Config.OPTIMAL_THRESHOLD)
+    threshold = _serving_threshold(metadata)
     return {
         "summary": monitor.get_summary(),
         "business_metrics": monitor.get_business_metrics(threshold=threshold),

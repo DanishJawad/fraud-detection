@@ -18,10 +18,11 @@ class Config:
     API_TITLE = "Fraud Detection API"
     API_VERSION = "1.0.0"
 
-    # Fallback only, used if models/metadata.json is missing. In normal
-    # operation the real threshold comes from metadata["optimal_threshold"],
-    # written by scripts/train.py — see app/main.py's /predict handler.
-    OPTIMAL_THRESHOLD = float(os.getenv("OPTIMAL_THRESHOLD", 0.35))
+    # There is deliberately no threshold constant here. The decision threshold
+    # lives in exactly one place, models/metadata.json, written by
+    # scripts/train.py and read by app/main.py::_serving_threshold. Keeping a
+    # copy in config or an env var is what let this repo drift to three
+    # different thresholds at once.
 
     # Business costs (defaults, can be changed by CLI/env)
     COST_FALSE_POSITIVE = float(os.getenv("COST_FALSE_POSITIVE", 50))

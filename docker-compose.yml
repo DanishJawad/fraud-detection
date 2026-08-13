@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   fraud-api:
     build: .
@@ -7,11 +5,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      # models/ is gitignored and built locally by scripts/train.py. Run that
+      # before `docker compose up` or the API starts and reports unhealthy.
       - ./models:/app/models
-      - ./monitoring:/app/monitoring
     environment:
       - MODEL_VERSION=1.0.0
-      - OPTIMAL_THRESHOLD=0.35
+      # No OPTIMAL_THRESHOLD here: the threshold comes from the trained
+      # artifact in models/metadata.json, never from the environment.
     restart: unless-stopped
 
   monitoring-dashboard:

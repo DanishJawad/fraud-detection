@@ -1,57 +1,122 @@
-import streamlit as st
-import yaml
-import io
+"""Streamlit demo: score an uploaded CSV and explore the cost/threshold tradeoff.
+
+Separate from dashboard/app.py, which monitors a running API. This one loads
+the model directly and scores a file you upload.
+"""
+import json
+from pathlib import Path
+
 import pandas as pd
-from src.utils import load_model, load_config
-from src.features import create_features
+import streamlit as st
+
 from src.evaluation import sweep_thresholds
+from src.utils import load_config, load_model
 
-st.set_page_config(page_title="Fraud Detection Demo")
+st.set_page_config(page_title="Fraud Detection Demo", layout="wide")
 
-config = load_config('config.yaml')
-model = None
-try:
-    model = load_model('models/fraud_model.pkl')
-except Exception:
-    model = None
+MODELS_DIR = Path("models")
 
-st.title('Fraud Detection — Cost-Aware Demo')
 
-st.sidebar.header('Cost settings')
-cost_fp = st.sidebar.number_input('Cost per False Positive', value=config.get('cost_fp',50))
-cost_fn = st.sidebar.number_input('Cost per False Negative', value=config.get('cost_fn',500))
+@st.cache_resource
+def load_artifacts():
+    """Load the model and its metadata, or (None, None) if not trained yet."""
+    try:
+        model = load_model(MODELS_DIR / "fraud_model.pkl")
+    except Exception:
+        return None, None
+    metadata = {}
+    metadata_path = MODELS_DIR / "metadata.json"
+    if metadata_path.exists():
+        with open(metadata_path) as f:
+            metadata = json.load(f)
+    return model, metadata
 
-st.sidebar.markdown('---')
+
+config = load_config("config.yaml")
+model, metadata = load_artifacts()
+
+st.title("Fraud Detection — Cost-Aware Demo")
 
 if model is None:
-    st.warning('Model artifact not found. Run the baseline script to create models/fraud_model.pkl')
+    st.warning(
+        "No model found at models/fraud_model.pkl. "
+        "Run `python scripts/train.py` first, then reload this page."
+    )
+    st.stop()
 
-st.write('Upload a CSV of transactions (with columns similar to the Kaggle dataset).')
-uploaded = st.file_uploader('Upload CSV (optional)', type=['csv'])
+# The model's own feature list, so this demo can't drift from what was trained.
+feature_names = metadata.get("features") or []
+trained_threshold = (metadata.get("threshold") or {}).get("value")
 
-if uploaded is not None:
-    df = pd.read_csv(uploaded)
-    st.write('Rows:', len(df))
-    df_proc = create_features(df)
-    # Prepare features for model
-    X = df_proc.drop(columns=[c for c in ['Class'] if c in df_proc.columns], errors='ignore')
-    if model is None:
-        st.error('No model available to score. Run notebooks/01_baseline.py or notebooks/03_imbalance.py first.')
-    else:
-        proba = model.predict_proba(X)[:,1]
-        df_proc['score'] = proba
-        st.write(df_proc.head(10))
-        threshold = st.slider('Threshold for positive (flag)', 0.0, 1.0, float(config.get('optimal_threshold',0.5)))
-        preds = (proba >= threshold).astype(int)
-        st.write('Flagged:', int(preds.sum()))
+st.sidebar.header("Cost settings")
+cost_fp = st.sidebar.number_input(
+    "Cost per false positive", value=float(config.get("cost_fp", 50))
+)
+cost_fn = st.sidebar.number_input(
+    "Cost per false negative", value=float(config.get("cost_fn", 500))
+)
 
-        # If true labels provided, compute optimal threshold on uploaded data
-        if 'Class' in df_proc.columns:
-            opt_t, opt_cost, thresholds, costs = sweep_thresholds(proba, df_proc['Class'], cost_fp, cost_fn)
-            st.write(f'Optimal threshold for provided cost settings: {opt_t:.3f} (expected cost ${opt_cost:.2f})')
-        else:
-            st.info('No true labels in uploaded data — cannot compute optimal threshold.')
+if trained_threshold is not None:
+    st.sidebar.caption(
+        f"Threshold selected on validation during training: {trained_threshold:.2f}"
+    )
 
-        st.download_button('Download scored CSV', df_proc.to_csv(index=False), file_name='scored.csv')
+st.write(
+    f"Upload a CSV with the {len(feature_names)} columns the model was trained on "
+    "(V1-V28 and Amount). A `Class` column, if present, is used to score the result."
+)
+uploaded = st.file_uploader("Upload CSV", type=["csv"])
+
+if uploaded is None:
+    st.info("Upload a CSV to score transactions.")
+    st.stop()
+
+df = pd.read_csv(uploaded)
+st.write("Rows:", len(df))
+
+missing = [c for c in feature_names if c not in df.columns]
+if missing:
+    st.error(
+        f"CSV is missing {len(missing)} column(s) the model needs: "
+        f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}"
+    )
+    st.stop()
+
+# Select by name in the trained order. Selecting explicitly rather than
+# dropping unwanted columns means an extra column in the upload is ignored
+# instead of being silently fed to the model in the wrong position.
+X = df[feature_names]
+
+with st.spinner("Scoring..."):
+    proba = model.predict_proba(X)[:, 1]
+
+scored = df.copy()
+scored["fraud_probability"] = proba
+
+default_threshold = float(trained_threshold) if trained_threshold is not None else 0.5
+threshold = st.slider("Flag transactions above", 0.0, 1.0, default_threshold, 0.01)
+flagged = int((proba >= threshold).sum())
+st.metric("Flagged", f"{flagged:,}", f"{100.0 * flagged / len(df):.2f}% of uploaded rows")
+
+st.dataframe(scored.head(20))
+
+if "Class" in df.columns:
+    opt_t, opt_cost, _, _ = sweep_thresholds(proba, df["Class"], cost_fp, cost_fn)
+    st.write(
+        f"Cost-minimizing threshold on this file: {opt_t:.2f} "
+        f"(cost ${opt_cost:,.2f} at the sidebar's cost settings)"
+    )
+    st.caption(
+        "Computed on the uploaded file, which is a threshold fit to this data. "
+        "It is not a held-out estimate — the shipped threshold comes from the "
+        "validation split in scripts/train.py."
+    )
 else:
-    st.info('Upload a CSV to score transactions or run the baseline scripts to generate model artifacts.')
+    st.info("No `Class` column in the upload, so cost cannot be computed.")
+
+st.download_button(
+    "Download scored CSV",
+    scored.to_csv(index=False),
+    file_name="scored.csv",
+    mime="text/csv",
+)

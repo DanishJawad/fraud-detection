@@ -12,7 +12,14 @@ from sklearn.metrics import roc_auc_score
 
 
 class RetrainingPipeline:
-    """Retraining pipeline that promotes a model if it improves ROC-AUC."""
+    """Retraining pipeline that promotes a model if it improves ROC-AUC.
+
+    Scaffolding: nothing currently calls this. Before wiring it to a scheduler
+    it needs its own validation split for threshold selection. Right now it
+    carries the existing threshold forward unchanged, which is only valid if
+    the new model's probability distribution matches the old one's — not
+    something to assume after retraining on new data.
+    """
 
     def __init__(self, models_dir: Path, data_dir: Path, drift_threshold: float = 0.15):
         self.models_dir = Path(models_dir)
@@ -60,7 +67,10 @@ class RetrainingPipeline:
             new_roc_auc = roc_auc_score(y_test, y_pred_proba)
 
             if self.current_metadata:
-                current_roc = self.current_metadata.get("roc_auc", 0)
+                # Test-set ROC-AUC lives under "test" in the metadata written
+                # by scripts/train.py. Reading a flat "roc_auc" here would
+                # silently default to 0 and promote every candidate model.
+                current_roc = (self.current_metadata.get("test") or {}).get("roc_auc", 0)
                 if new_roc_auc > current_roc:
                     self._promote_model(new_model, scaler, new_roc_auc)
                     return True
@@ -76,7 +86,23 @@ class RetrainingPipeline:
     def _promote_model(self, model, scaler, roc_auc: float):
         joblib.dump(model, self.models_dir / "fraud_model.pkl")
         joblib.dump(scaler, self.models_dir / "scaler.pkl")
-        metadata = {"roc_auc": roc_auc, "promoted_at": datetime.now().isoformat(), "optimal_threshold": 0.35}
+
+        # Must match the shape scripts/train.py writes, or app/main.py cannot
+        # find a threshold and refuses to serve. Carried forward rather than
+        # hardcoded — a literal here is how the repo previously ended up with
+        # several conflicting thresholds.
+        previous = self.current_metadata or {}
+        threshold = dict(previous.get("threshold") or {})
+        threshold["carried_forward_from"] = previous.get("trained_at")
+        threshold["selected_on"] = "inherited (not re-selected for this model)"
+
+        metadata = {
+            **previous,
+            "promoted_at": datetime.now().isoformat(),
+            "model": "StandardScaler + SMOTE -> RandomForestClassifier (retrained)",
+            "threshold": threshold,
+            "test": {**(previous.get("test") or {}), "roc_auc": roc_auc},
+        }
         with open(self.models_dir / "metadata.json", "w") as f:
             json.dump(metadata, f, indent=2)
         self.last_retrain = datetime.now()

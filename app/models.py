@@ -23,10 +23,19 @@ class HealthResponse(BaseModel):
 
 
 class MetricsResponse(BaseModel):
+    """Training-time metrics on the held-out test set.
+
+    These are static properties of the shipped model, not live traffic. Live
+    numbers come from /monitoring, computed from labeled feedback.
+    """
     roc_auc: float
-    fraud_detection_rate: float
-    false_alarm_rate: float
+    recall: float
+    precision: float
+    false_positive_rate: float
     cost_savings_percent: float
+    threshold: float
+    n_test: int
+    n_fraud_test: int
 
 
 class FeedbackRequest(BaseModel):

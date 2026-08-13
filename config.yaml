@@ -1,9 +1,13 @@
-# Default cost assumptions (tune these for business sensitivity)
-# Read by scripts/train.py to pick the cost-minimizing threshold during training.
-cost_fp: 50   # cost per false positive (e.g., manual review cost or lost revenue)
+# Cost assumptions. These are the only tunable inputs to threshold selection:
+# scripts/train.py sweeps thresholds on the validation split and keeps the one
+# minimizing (false_positives * cost_fp + false_negatives * cost_fn).
+#
+# Illustrative figures, not real business numbers. Changing them changes the
+# selected threshold, which is the entire point of the sweep — see
+# outputs/cost_sensitivity.csv for how much.
+cost_fp: 50   # cost per false positive (manual review of a legitimate transaction)
 cost_fn: 500  # cost per false negative (missed fraud)
 
-# UI slider default for the root app.py demo only. The threshold actually used
-# by the API is whatever scripts/train.py computed and wrote to
-# models/metadata.json — this value is never read by app/main.py.
-optimal_threshold: 0.5
+# No threshold here on purpose. The decision threshold is an output of
+# training, not a configuration value. It is written to models/metadata.json
+# by scripts/train.py and read from there by app/main.py.
