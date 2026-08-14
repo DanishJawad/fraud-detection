@@ -1,0 +1,62 @@
+{
+  "old_biased": {
+    "protocol": "80/20 temporal split; threshold swept on TEST and reported on TEST (biased)",
+    "n_train": 227845,
+    "n_fraud_train": 417,
+    "n_test": 56962,
+    "n_fraud_test": 75,
+    "threshold": 0.41000000000000003,
+    "roc_auc": 0.9773936634614822,
+    "recall": 0.7733333333333333,
+    "precision": 0.90625,
+    "false_positive_rate": 0.00010547225200836747,
+    "confusion": {
+      "tp": 58,
+      "fp": 6,
+      "fn": 17,
+      "tn": 56881
+    },
+    "cost": 8800.0
+  },
+  "old_honest": {
+    "protocol": "same 80/20 model; threshold selected on a slice of its own training window, then scored on TEST",
+    "threshold": 0.37,
+    "roc_auc": 0.9773936634614822,
+    "recall": 0.7733333333333333,
+    "precision": 0.8787878787878788,
+    "false_positive_rate": 0.00014062966934448996,
+    "confusion": {
+      "tp": 58,
+      "fp": 8,
+      "fn": 17,
+      "tn": 56879
+    },
+    "cost": 8900.0
+  },
+  "current": {
+    "protocol": "60/20/20 temporal split; threshold selected on VAL, scored once on TEST",
+    "n_train": 170888,
+    "n_fraud_train": 360,
+    "n_test": 56962,
+    "n_fraud_test": 75,
+    "threshold": 0.5,
+    "roc_auc": 0.9666434627712248,
+    "recall": 0.7333333333333333,
+    "precision": 0.9322033898305084,
+    "false_positive_rate": 7.031483467224498e-05,
+    "confusion": {
+      "tp": 55,
+      "fp": 4,
+      "fn": 20,
+      "tn": 56883
+    },
+    "cost": 10200.0
+  },
+  "deltas": {
+    "recall_old_biased_minus_current": 0.040000000000000036,
+    "roc_auc_old_biased_minus_current": 0.010750200690257339,
+    "recall_selection_bias_only": 0.0
+  },
+  "generated_at": "2026-08-14T11:27:12.889542+00:00",
+  "random_state": 42
+}

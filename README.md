@@ -86,18 +86,35 @@ future information and overstates what the model would do on live traffic.
 
 **The threshold is chosen on validation only.** An earlier version of this repo swept
 thresholds against `y_test` and then reported metrics at the winning threshold on that same
-test set. That biases recall upward, because the threshold is fit to the test split's specific
-errors. Carving out a validation split cost real accuracy, and the drop is the honest measure
-of how much the old number was inflated:
+test set. The threshold is then fit to the test split's specific errors, which is indefensible
+regardless of what it does to the number.
 
-| | Old (threshold picked on test) | Now (picked on validation) |
-|---|---|---|
-| Train size | 227,845 rows, 417 fraud | 170,888 rows, 360 fraud |
-| Recall | 77.3% | 73.33% |
-| ROC-AUC | 0.9774 | 0.9666 |
+`scripts/measure_selection_bias.py` regenerates all three configurations and writes
+[`outputs/selection_bias.json`](outputs/selection_bias.json), so the comparison below is
+reproducible rather than quoted from a run whose artifact no longer exists:
 
-Some of that drop is the smaller training set and some is the removal of the optimistic bias;
-this repo does not separate the two.
+| | Old: 80/20, threshold on test | Old model, threshold off-test | Now: 60/20/20, threshold on val |
+|---|---|---|---|
+| Train size | 227,845 rows, 417 fraud | same | 170,888 rows, 360 fraud |
+| Threshold | 0.41 | 0.37 | 0.50 |
+| Recall | 77.3333% | 77.3333% | 73.3333% |
+| Precision | 90.6250% | 87.8788% | 93.2203% |
+| ROC-AUC | 0.9774 | 0.9774 | 0.9666 |
+| Cost | $8,800 | $8,900 | $10,200 |
+
+The middle column holds the model fixed and changes only where the threshold came from.
+**Recall is identical to four decimal places**, and cost moves by $100, one false positive. So
+on this data the threshold-on-test mistake inflated the reported recall by essentially nothing.
+The entire 77.33% to 73.33% drop comes from training on 57 fewer frauds after carving out the
+validation split, not from removing the bias.
+
+That does not make the old protocol acceptable: it was unjustifiable in advance, and the fact
+that it happened to cost nothing here is luck, not a defence. But claiming the fix "corrected
+an inflated metric" would itself be a false claim, so it is not made.
+
+One caveat on the middle column: the off-test threshold is taken from the last quarter of that
+model's own training window, so the model had already seen that data. It isolates the
+threshold's provenance, not a fully clean holdout.
 
 ### Limitations
 
