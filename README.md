@@ -251,9 +251,9 @@ threshold's provenance, not a fully clean holdout.
   transfers to a real fraud system without redoing feature work from scratch.
 - Feedback labels update the monitor's in-memory log only; `/monitoring` resets on restart.
   Fixing that properly means the Postgres path scaffolded in `monitoring/db.py`.
-- `retrain/pipeline.py` is scaffolding that nothing calls. It carries the existing threshold
-  forward instead of re-selecting it on a validation split, and should not be scheduled until
-  it does.
+- **There is no automated retraining.** Retraining means running `scripts/train.py` by hand.
+  A scheduled version would need its own validation split to re-select the threshold, since
+  a new model's probabilities will not line up with the old one's operating point.
 
 ## Superseded results — do not reuse
 
