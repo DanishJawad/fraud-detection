@@ -194,11 +194,22 @@ with model_tab:
             )
 
         with st.container(border=True):
-            st.markdown("**Cost saving vs. logistic regression baseline**")
+            st.markdown("**Cost vs. logistic regression baseline**")
             st.metric(
-                "Lower cost on test",
+                "Point estimate, lower cost on test",
                 f"{metrics.get('cost_savings_percent', 0):.1f}%",
                 help="Both models had their threshold chosen on validation.",
+            )
+            # Shown without this caveat, the tile reads as a settled result.
+            # Bootstrapping the test set puts the 95% interval across zero,
+            # so the direction holds but the margin does not.
+            st.markdown(
+                "<p class='caption-muted'>Single draw on a test set with "
+                f"{n_fraud_test} frauds, not a stable margin. Resampling the "
+                "test set 5,000 times leaves the baseline cheaper in ~15% of "
+                "draws and the 95% interval on the difference crosses zero. "
+                "See outputs/bootstrap_cost.json.</p>",
+                unsafe_allow_html=True,
             )
 
 with health_tab:

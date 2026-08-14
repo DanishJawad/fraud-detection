@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-08-14T11:48:52.123405+00:00",
+  "random_state": 42,
+  "bootstrap_seed": 0,
+  "n_resamples": 5000,
+  "n_test": 56962,
+  "n_fraud_test": 75,
+  "costs": {
+    "cost_false_positive": 50.0,
+    "cost_false_negative": 500.0
+  },
+  "point_estimate": {
+    "smote_rf_threshold": 0.5,
+    "baseline_threshold": 0.11,
+    "smote_rf_cost": 10200.0,
+    "baseline_cost": 11800.0,
+    "smote_rf_cheaper_by_percent": 13.559322033898303,
+    "smote_rf_roc_auc": 0.9666434627712248,
+    "baseline_roc_auc": 0.972970977551989
+  },
+  "bootstrap": {
+    "smote_rf_cheaper_percent": 84.44,
+    "tied_percent": 0.78,
+    "baseline_cheaper_percent": 14.78,
+    "cost_difference_median": 1600.0,
+    "cost_difference_ci95_low": -1350.0,
+    "cost_difference_ci95_high": 4650.0,
+    "ci95_crosses_zero": true
+  }
+}

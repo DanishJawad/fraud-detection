@@ -134,6 +134,10 @@ def main(data_path: str, out_dir: str):
         test_proba, y_test, NAIVE_THRESHOLD, cost_fp, cost_fn
     )
 
+    # Point estimate on a single test set holding 75 frauds. Do not quote it
+    # as a settled margin: scripts/bootstrap_cost_comparison.py resamples the
+    # test set and the 95% interval on the cost difference crosses zero, so
+    # the direction is supported but the size is not.
     cost_savings_percent = (
         100.0 * (1 - test_metrics["cost"] / baseline_test["cost"])
         if baseline_test["cost"] > 0
