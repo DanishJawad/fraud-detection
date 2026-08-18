@@ -12,3 +12,4 @@ data/
 .env.local
 docs/
 monitoring/*.jsonl
+.vscode/
