@@ -51,22 +51,26 @@ without downloading the dataset or retraining. Nothing in this README is typed b
 
 ## Run it locally
 
-Requires Python 3.11 (`numpy`, `pandas`, `scikit-learn` and `scipy` all require >= 3.11).
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.11 (`numpy`, `pandas`, `scikit-learn` and
+`scipy` all require >= 3.11; `uv sync` installs the interpreter itself if you don't have it).
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
+uv sync --locked   # installs from uv.lock: exact versions, no resolution surprises
 
 # Download creditcard.csv from Kaggle and place it at data/creditcard.csv, then:
-python scripts/train.py
+uv run scripts/train.py
 
 # Terminal 1: API
-PYTHONPATH=. uvicorn app.main:app --port 8000
+PYTHONPATH=. uv run uvicorn app.main:app --port 8000
 
 # Terminal 2: dashboard
-streamlit run dashboard/app.py
+uv run streamlit run dashboard/app.py
 ```
+
+`pyproject.toml` + `uv.lock` are the one source of dependency truth: `uv.lock` pins the full
+transitive graph with hashes, not just top-level packages, which is stronger than the old
+`requirements.txt` pins were. `uv sync --locked` fails loudly if the lockfile and
+`pyproject.toml` ever drift apart, rather than silently installing something else.
 
 Try it:
 
@@ -80,7 +84,7 @@ curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" \
 ### Prove the monitoring is real, not wired-but-dead
 
 ```bash
-python scripts/simulate_traffic.py --n 3000
+uv run scripts/simulate_traffic.py --n 3000
 ```
 
 This replays held-out transactions through `/predict`, follows each with `/feedback` carrying
@@ -90,7 +94,7 @@ so the detection rate moves as real frauds are replayed and flagged.
 ### Docker
 
 ```bash
-python scripts/train.py   # models/ is gitignored; build it before compose mounts it
+uv run scripts/train.py   # models/ is gitignored; build it before compose mounts it
 docker compose up --build
 # API: http://localhost:8000
 # Dashboard: http://localhost:8501
@@ -106,14 +110,16 @@ inside the container hash identically to the host copies, and `models/metadata.j
 identically to `outputs/metrics.json`, so the threshold the API serves is the same one recorded
 with the published metrics.
 
-Both images are about 1.23 GB, almost entirely the scientific Python stack. The build context
+Both images are about 1.19 GB, almost entirely the scientific Python stack. The build context
 itself is ~0.1 MB thanks to `.dockerignore`; without it, `COPY . /app` would pull in `data/`
-(~370 MB) and `.venv/` (~620 MB).
+(~370 MB) and `.venv/` (~620 MB). `uv sync` runs with `--no-cache` in both Dockerfiles &mdash;
+without it, uv's own download cache (~540 MB for this dependency set) gets baked into the image
+layer on top of the installed environment, found and fixed while verifying this migration.
 
 ### Tests
 
 ```bash
-PYTHONPATH=. pytest tests/ -v
+PYTHONPATH=. uv run pytest tests/ -v
 ```
 
 18 tests covering the API endpoints, the SMOTE pipeline (no leakage into held-out data,
@@ -142,7 +148,6 @@ handling, and the monitoring feedback loop.
 
 Two further scripts exist to check the claims above rather than to produce the model:
 `scripts/measure_selection_bias.py` and `scripts/bootstrap_cost_comparison.py`.
-`notebooks/*.py` are exploration history and are not what the shipped artifacts trace back to.
 
 ### One threshold, one place
 

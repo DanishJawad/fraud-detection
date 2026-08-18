@@ -28,8 +28,6 @@ models/
 .env.local
 .envrc
 
-notebooks/
-docs/
 tests/
 monitoring/*.jsonl
 

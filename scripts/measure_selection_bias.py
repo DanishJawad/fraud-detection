@@ -31,12 +31,7 @@ from sklearn.metrics import roc_auc_score
 
 from src.evaluation import metrics_at_threshold, sweep_thresholds
 from src.models import train_smote_pipeline
-from src.preprocessing import (
-    load_data,
-    split_xy,
-    train_test_split_time,
-    train_val_test_split_time,
-)
+from src.preprocessing import load_data, split_xy, train_val_test_split_time
 from src.utils import load_config
 
 RANDOM_STATE = 42
@@ -44,6 +39,19 @@ RANDOM_STATE = 42
 
 def _features(X):
     return X.drop(columns=[c for c in ["Time"] if c in X.columns])
+
+
+def _old_two_way_split(df, test_size=0.2, time_col="Time"):
+    """The original, wrong split: 80/20, no validation carve-out.
+
+    Kept only here, not in src/preprocessing.py, because this script is the
+    one place that deliberately reproduces the old protocol for comparison.
+    Nothing that trains or serves the current model should call this.
+    """
+    cutoff = df[time_col].quantile(1 - test_size)
+    train = df[df[time_col] <= cutoff]
+    test = df[df[time_col] > cutoff]
+    return train, test
 
 
 def main(data_path: str, out_dir: str):
@@ -54,7 +62,7 @@ def main(data_path: str, out_dir: str):
     results = {}
 
     # --- The original protocol: 80/20, threshold chosen on the test set -----
-    train80, test20 = train_test_split_time(df, test_size=0.2)
+    train80, test20 = _old_two_way_split(df, test_size=0.2)
     X80, y80 = split_xy(train80)
     Xt20, yt20 = split_xy(test20)
     X80, Xt20 = _features(X80), _features(Xt20)
