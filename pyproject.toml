@@ -1,7 +1,7 @@
 [project]
 name = "fraud-detection"
 version = "0.1.0"
-description = "Cost-optimized fraud detection: SMOTE + RandomForest, threshold selected on a validation split, served over FastAPI."
+description = "Credit card fraud detection: SMOTE + RandomForest, threshold selected on a validation split, served over FastAPI."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

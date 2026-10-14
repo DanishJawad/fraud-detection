@@ -1,4 +1,4 @@
-# Cost-Optimized Fraud Detection
+# Credit Card Fraud Detection
 
 Fraud is 0.173% of transactions in this dataset, so a model optimized for accuracy predicts
 "not fraud" every time and scores 99.83%. This project trains a SMOTE + RandomForest pipeline
